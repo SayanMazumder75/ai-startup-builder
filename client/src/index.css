@@ -1,0 +1,112 @@
+/* ═══════════════════════════════════════════════
+   AI STARTUP BUILDER — GLOBAL STYLES
+   Design: Dark neomorphic SaaS with amber accents
+   ═══════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-void:     #05050a;
+  --bg-base:     #0a0a12;
+  --bg-surface:  #0f0f1a;
+  --bg-elevated: #14141f;
+  --bg-card:     #1a1a28;
+  --bg-hover:    #1f1f30;
+
+  --border:      rgba(255,255,255,0.06);
+  --border-glow: rgba(251,191,36,0.3);
+
+  --amber:       #fbbf24;
+  --amber-light: #fcd34d;
+  --amber-dim:   rgba(251,191,36,0.15);
+  --amber-glow:  rgba(251,191,36,0.08);
+
+  --violet:      #8b5cf6;
+  --violet-dim:  rgba(139,92,246,0.15);
+
+  --cyan:        #22d3ee;
+  --cyan-dim:    rgba(34,211,238,0.1);
+
+  --green:       #34d399;
+  --red:         #f87171;
+
+  --text-primary:   #f8f8ff;
+  --text-secondary: #9b9bba;
+  --text-muted:     #5a5a72;
+
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+
+  --radius-sm:  6px;
+  --radius-md:  12px;
+  --radius-lg:  20px;
+  --radius-xl:  32px;
+
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.04) inset;
+  --shadow-glow: 0 0 40px rgba(251,191,36,0.15);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--bg-card); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-hover); }
+
+/* Selection */
+::selection { background: var(--amber-dim); color: var(--amber-light); }
+
+/* Utility classes */
+.font-display { font-family: var(--font-display); }
+.font-mono    { font-family: var(--font-mono); }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(251,191,36,0.2); }
+  50%       { box-shadow: 0 0 40px rgba(251,191,36,0.4); }
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes orb-float {
+  0%, 100% { transform: translate(0,0) scale(1); }
+  33%       { transform: translate(30px,-20px) scale(1.05); }
+  66%       { transform: translate(-20px,10px) scale(0.95); }
+}
+
+.animate-fade-in { animation: fadeIn 0.5s ease both; }
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, var(--amber) 0%, var(--amber-light) 50%, #f97316 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass card */
+.glass {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-card);
+}
