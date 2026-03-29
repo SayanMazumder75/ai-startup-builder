@@ -16,7 +16,7 @@ export default function PitchDeckTab({ data, branding }) {
   const primaryName = branding?.nameOptions?.[0]?.name || 'Startup';
   const tagline = branding?.tagline || '';
   const primaryColor = branding?.colorPalette?.primary?.hex || '#fbbf24';
-  const accentColor = branding?.colorPalette?.accent?.hex || '#f97316';
+  // const accentColor = branding?.colorPalette?.accent?.hex || '#f97316';
 
   return (
     <div style={s.root}>
