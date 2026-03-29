@@ -1,4 +1,4 @@
-const BASE = '/api';
+const BASE = process.env.REACT_APP_API_URL || 'https://ai-startup-builder-server.onrender.com/api';
 
 const request = async (method, path, body, token) => {
   const headers = { 'Content-Type': 'application/json' };
