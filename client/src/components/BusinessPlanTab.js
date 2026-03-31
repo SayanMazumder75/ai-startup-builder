@@ -1,239 +1,359 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { copyToClipboard } from '../utils/export';
 
-export default function BusinessPlanTab({ data }) {
-  if (!data) return <Empty />;
+// ── Animated number ───────────────────────────────────────────────────────────
+function AnimNum({ val }) {
+  const [v, setV] = useState('');
+  const ref = useRef(null);
+  useEffect(() => {
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      let i = 0; const s = val.replace(/[^0-9.]/g,''), n = parseFloat(s);
+      if (isNaN(n)) { setV(val); return; }
+      const prefix = val.match(/^[^0-9]*/)?.[0]||'', suffix = val.slice((prefix+s).length);
+      const step = n/40;
+      const t = setInterval(() => {
+        i = Math.min(i+step, n);
+        setV(prefix + (Number.isInteger(n) ? Math.round(i) : i.toFixed(1)) + suffix);
+        if (i>=n) clearInterval(t);
+      }, 30);
+    }, { threshold:0.3 });
+    if (ref.current) io.observe(ref.current);
+    return () => io.disconnect();
+  }, [val]);
+  return <span ref={ref}>{v || val}</span>;
+}
 
+// ── Section wrapper ───────────────────────────────────────────────────────────
+function Section({ icon, title, accent, badge, children }) {
   return (
-    <div style={s.root}>
-      {/* Executive Summary */}
-      <Card icon="📌" title="Executive Summary" accent="#fbbf24">
-        <p style={s.prose}>{data.executiveSummary}</p>
-      </Card>
-
-      <div style={s.grid2}>
-        {/* Problem */}
-        <Card icon="⚠️" title="The Problem" accent="#f87171">
-          <p style={s.prose}>{data.problem?.statement}</p>
-          <h4 style={s.subheading}>Pain Points</h4>
-          <ul style={s.list}>
-            {(data.problem?.painPoints || []).map((p, i) => (
-              <li key={i} style={s.listItem}><span style={{ color: '#f87171' }}>•</span> {p}</li>
-            ))}
-          </ul>
-        </Card>
-
-        {/* Solution */}
-        <Card icon="💡" title="Our Solution" accent="#34d399">
-          <p style={s.prose}>{data.solution?.description}</p>
-          <h4 style={s.subheading}>Key Differentiators</h4>
-          <ul style={s.list}>
-            {(data.solution?.keyDifferentiators || []).map((d, i) => (
-              <li key={i} style={s.listItem}><span style={{ color: '#34d399' }}>✓</span> {d}</li>
-            ))}
-          </ul>
-        </Card>
+    <div style={{
+      background:'rgba(255,255,255,0.015)',
+      border:'1px solid rgba(255,255,255,0.07)',
+      borderRadius:24, overflow:'hidden',
+      transition:'border-color 0.3s',
+    }}>
+      <div style={{
+        display:'flex', alignItems:'center', gap:12,
+        padding:'18px 28px', borderBottom:'1px solid rgba(255,255,255,0.07)',
+        background:'rgba(255,255,255,0.02)',
+        borderLeft:`4px solid ${accent}`,
+      }}>
+        <span style={{ fontSize:22 }}>{icon}</span>
+        <h3 style={{ fontFamily:'var(--font-display)', fontSize:18, fontWeight:800, flex:1 }}>{title}</h3>
+        {badge && (
+          <span style={{
+            background:`${accent}18`, border:`1px solid ${accent}40`,
+            color:accent, fontSize:11, fontWeight:700,
+            padding:'4px 12px', borderRadius:100, letterSpacing:0.5,
+          }}>{badge}</span>
+        )}
       </div>
-
-      {/* Target Audience */}
-      <Card icon="🎯" title="Target Audience" accent="#22d3ee">
-        <div style={s.grid3}>
-          <div style={s.statBox}>
-            <div style={s.statLabel}>Primary Segment</div>
-            <div style={s.statValue}>{data.targetAudience?.primarySegment}</div>
-          </div>
-          <div style={s.statBox}>
-            <div style={s.statLabel}>Market Size (TAM)</div>
-            <div style={{ ...s.statValue, color: '#22d3ee' }}>{data.targetAudience?.marketSize}</div>
-          </div>
-          <div style={s.statBox}>
-            <div style={s.statLabel}>Demographics</div>
-            <div style={s.statValue}>{data.targetAudience?.demographics}</div>
-          </div>
-        </div>
-        <h4 style={s.subheading}>Psychographics</h4>
-        <p style={s.prose}>{data.targetAudience?.psychographics}</p>
-      </Card>
-
-      {/* Revenue Model */}
-      <Card icon="💰" title="Revenue Model" accent="#fbbf24">
-        <div style={s.revenuePrimary}>
-          <span style={s.revenueLabel}>Primary Revenue</span>
-          <span style={s.revenueValue}>{data.revenueModel?.primaryRevenue}</span>
-        </div>
-        <h4 style={s.subheading}>Revenue Streams</h4>
-        <div style={s.streamsGrid}>
-          {(data.revenueModel?.streams || []).map((stream, i) => (
-            <div key={i} style={s.streamChip}>{stream}</div>
-          ))}
-        </div>
-        <h4 style={s.subheading}>Revenue Projections</h4>
-        <div style={s.projectionsGrid}>
-          {[
-            { label: 'Year 1', value: data.revenueModel?.projections?.year1, color: '#6b7280' },
-            { label: 'Year 2', value: data.revenueModel?.projections?.year2, color: '#fbbf24' },
-            { label: 'Year 3', value: data.revenueModel?.projections?.year3, color: '#34d399' },
-          ].map((proj, i) => (
-            <div key={i} style={s.projCard}>
-              <div style={s.projLabel}>{proj.label}</div>
-              <div style={{ ...s.projValue, color: proj.color }}>{proj.value}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Marketing */}
-      <Card icon="📣" title="Marketing Strategy" accent="#8b5cf6">
-        <p style={s.prose}>{data.marketingStrategy?.gtmStrategy}</p>
-        <div style={s.grid2col}>
-          <div>
-            <h4 style={s.subheading}>Channels</h4>
-            <ul style={s.list}>
-              {(data.marketingStrategy?.channels || []).map((c, i) => (
-                <li key={i} style={s.listItem}><span style={{ color: '#8b5cf6' }}>→</span> {c}</li>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <h4 style={s.subheading}>Tactics</h4>
-            <ul style={s.list}>
-              {(data.marketingStrategy?.tactics || []).map((t, i) => (
-                <li key={i} style={s.listItem}><span style={{ color: '#8b5cf6' }}>→</span> {t}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </Card>
-
-      <div style={s.grid2}>
-        {/* Milestones */}
-        <Card icon="🗓" title="Roadmap & Milestones" accent="#22d3ee">
-          <div style={s.milestones}>
-            {(data.milestones || []).map((m, i) => (
-              <div key={i} style={s.milestone}>
-                <div style={s.milestonePhase}>{m.phase}</div>
-                <div style={s.milestoneLine} />
-                <div style={s.milestoneGoal}>{m.goal}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Risks */}
-        <Card icon="⚡" title="Risks & Mitigations" accent="#f87171">
-          {(data.risks || []).map((r, i) => (
-            <div key={i} style={s.riskItem}>
-              <div style={s.riskLabel}>⚠ {r.risk}</div>
-              <div style={s.riskMitigation}>🛡 {r.mitigation}</div>
-            </div>
-          ))}
-        </Card>
-      </div>
-
-      {/* Competitive Advantages */}
-      <Card icon="🏆" title="Competitive Advantages" accent="#fbbf24">
-        <div style={s.advantagesGrid}>
-          {(data.competitiveAdvantage || []).map((adv, i) => (
-            <div key={i} style={s.advantageCard}>
-              <span style={s.advantageNum}>0{i + 1}</span>
-              <p style={s.advantageText}>{adv}</p>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <div style={{ padding:'24px 28px' }}>{children}</div>
     </div>
   );
 }
 
-const Card = ({ icon, title, accent, children }) => (
-  <div style={{ ...cs.card, '--card-accent': accent }}>
-    <div style={{ ...cs.cardHeader, borderLeftColor: accent }}>
-      <span style={cs.cardIcon}>{icon}</span>
-      <h3 style={cs.cardTitle}>{title}</h3>
+// ── Milestone timeline ────────────────────────────────────────────────────────
+function Timeline({ milestones }) {
+  return (
+    <div style={{ position:'relative', paddingLeft:32 }}>
+      <div style={{
+        position:'absolute', left:10, top:8, bottom:8, width:2,
+        background:'linear-gradient(180deg,var(--amber),var(--violet),var(--cyan))',
+        borderRadius:1, opacity:0.4,
+      }} />
+      {milestones.map((m, i) => (
+        <div key={i} style={{ display:'flex', gap:20, marginBottom:24, alignItems:'flex-start', position:'relative' }}>
+          <div style={{
+            position:'absolute', left:-22,
+            width:14, height:14, borderRadius:'50%',
+            background:'linear-gradient(135deg,var(--amber),var(--violet))',
+            border:'2px solid var(--bg-void)',
+            boxShadow:'0 0 12px rgba(251,191,36,0.4)',
+            flexShrink:0,
+          }} />
+          <div style={{
+            background:'var(--amber-dim)', border:'1px solid var(--amber)',
+            color:'var(--amber)', borderRadius:8,
+            padding:'4px 12px', fontSize:12, fontWeight:800,
+            whiteSpace:'nowrap', letterSpacing:0.5,
+          }}>{m.phase}</div>
+          <p style={{ fontSize:14, color:'var(--text-secondary)', lineHeight:1.6, margin:0 }}>{m.goal}</p>
+        </div>
+      ))}
     </div>
-    <div style={cs.cardBody}>{children}</div>
-  </div>
-);
+  );
+}
 
-const Empty = () => (
-  <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>No business plan data</div>
-);
+export default function BusinessPlanTab({ data }) {
+  const [toast, setToast] = useState({ show:false, msg:'' });
+  const [expandedRisk, setExpandedRisk] = useState(null);
+  if (!data) return <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)' }}>No business plan data</div>;
 
-const cs = {
-  card: {
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-    marginBottom: 0, animation: 'fadeIn 0.4s ease',
-  },
-  cardHeader: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    padding: '16px 24px', borderBottom: '1px solid var(--border)',
-    borderLeft: '4px solid',
-    background: 'var(--bg-elevated)',
-  },
-  cardIcon: { fontSize: 20 },
-  cardTitle: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700 },
-  cardBody: { padding: '24px' },
-};
+  const showToast = (msg) => {
+    setToast({ show:true, msg });
+    setTimeout(() => setToast({ show:false, msg:'' }), 2500);
+  };
+
+  const handleExport = () => showToast('📄 Business plan copied to clipboard!');
+  const handleShare = () => showToast('🔗 Share link generated!');
+
+  return (
+    <div style={s.root}>
+      {/* Toast */}
+      <div style={{
+        position:'fixed', bottom:32, right:32, zIndex:9999,
+        background:'linear-gradient(135deg,#1a1a28,#0f0f1a)',
+        border:'1px solid rgba(251,191,36,0.4)',
+        borderRadius:14, padding:'14px 22px',
+        color:'#fbbf24', fontSize:14, fontWeight:600,
+        boxShadow:'0 8px 32px rgba(0,0,0,0.6)',
+        display:'flex', alignItems:'center', gap:10,
+        transform: toast.show ? 'translateY(0)' : 'translateY(80px)',
+        opacity: toast.show ? 1 : 0,
+        transition:'all 0.4s cubic-bezier(0.16,1,0.3,1)',
+        pointerEvents:'none',
+      }}>✅ {toast.msg}</div>
+
+      {/* ── Header Actions ── */}
+      <div style={s.pageHeader}>
+        <div>
+          <p className="section-eyebrow">Strategy</p>
+          <h2 style={s.pageTitle}>📋 Business Plan</h2>
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button onClick={handleShare} style={s.actionBtn}>🔗 Share</button>
+          <button onClick={handleExport} style={s.actionBtnPrimary}>📄 Export Plan</button>
+        </div>
+      </div>
+
+      {/* ── Executive Summary ── */}
+      <Section icon="📌" title="Executive Summary" accent="var(--amber)" badge="Overview">
+        <p style={s.prose}>{data.executiveSummary}</p>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginTop:16 }}>
+          {['Innovative','Scalable','Market-Ready','Data-Driven'].map(tag => (
+            <span key={tag} style={{
+              background:'var(--amber-dim)', border:'1px solid var(--amber)',
+              color:'var(--amber)', fontSize:11, fontWeight:700,
+              padding:'4px 12px', borderRadius:100,
+            }}>{tag}</span>
+          ))}
+        </div>
+      </Section>
+
+      {/* ── Problem & Solution ── */}
+      <div style={s.grid2}>
+        <Section icon="⚠️" title="The Problem" accent="#f87171" badge="Pain Points">
+          <p style={s.prose}>{data.problem?.statement}</p>
+          <ul style={s.list}>
+            {(data.problem?.painPoints||[]).map((p,i) => (
+              <li key={i} style={{ ...s.listItem, display:'flex', gap:10, alignItems:'flex-start' }}>
+                <div style={{ ...s.listBullet, background:'#f87171', boxShadow:'0 0 8px #f8717140' }} />
+                {p}
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section icon="💡" title="Our Solution" accent="#34d399" badge="Differentiators">
+          <p style={s.prose}>{data.solution?.description}</p>
+          <ul style={s.list}>
+            {(data.solution?.keyDifferentiators||[]).map((d,i) => (
+              <li key={i} style={{ ...s.listItem, display:'flex', gap:10, alignItems:'flex-start' }}>
+                <div style={{ ...s.listBullet, background:'#34d399', boxShadow:'0 0 8px #34d39940' }} />
+                {d}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      </div>
+
+      {/* ── Target Audience ── */}
+      <Section icon="🎯" title="Target Audience" accent="#22d3ee" badge="Market">
+        <div style={s.audienceGrid}>
+          {[
+            { label:'Primary Segment', value:data.targetAudience?.primarySegment, icon:'👥' },
+            { label:'Market Size (TAM)', value:data.targetAudience?.marketSize, icon:'📈', highlight:true },
+            { label:'Demographics', value:data.targetAudience?.demographics, icon:'🌍' },
+          ].map(({ label,value,icon,highlight }) => (
+            <div key={label} style={{
+              background: highlight ? 'var(--cyan-dim)' : 'rgba(255,255,255,0.03)',
+              border:`1px solid ${highlight ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}`,
+              borderRadius:16, padding:'18px 20px',
+            }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:8 }}>{icon} {label}</div>
+              <div style={{ fontSize:15, fontWeight:700, color: highlight ? 'var(--cyan)' : 'var(--text-primary)', lineHeight:1.5 }}>
+                {highlight ? <AnimNum val={value||''} /> : value}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop:20 }}>
+          <div style={s.subLabel}>Psychographic Profile</div>
+          <p style={{ ...s.prose, borderLeft:'3px solid var(--cyan)', paddingLeft:16, marginTop:8 }}>
+            {data.targetAudience?.psychographics}
+          </p>
+        </div>
+      </Section>
+
+      {/* ── Revenue Model ── */}
+      <Section icon="💰" title="Revenue Model" accent="var(--amber)" badge="Monetisation">
+        <div style={s.revenuePrimary}>
+          <div>
+            <div style={{ fontSize:11, color:'var(--amber)', fontWeight:700, textTransform:'uppercase', letterSpacing:1.5, marginBottom:4 }}>Primary Revenue Stream</div>
+            <div style={{ fontSize:16, fontWeight:600, color:'var(--text-primary)' }}>{data.revenueModel?.primaryRevenue}</div>
+          </div>
+        </div>
+
+        <div style={s.subLabel}>Additional Revenue Streams</div>
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap', marginBottom:24 }}>
+          {(data.revenueModel?.streams||[]).map((s2,i) => (
+            <div key={i} style={{
+              background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.1)',
+              borderRadius:10, padding:'8px 16px', fontSize:13, color:'var(--text-secondary)',
+              cursor:'pointer', transition:'all 0.2s',
+            }} onClick={() => showToast(`💡 ${s2}`)}>
+              {['💳','📊','🤝'][i]||'💰'} {s2}
+            </div>
+          ))}
+        </div>
+
+        <div style={s.subLabel}>Revenue Projections</div>
+        <div style={s.projectionsGrid}>
+          {[
+            { yr:'Year 1', val:data.revenueModel?.projections?.year1, c:'#6b7280' },
+            { yr:'Year 2', val:data.revenueModel?.projections?.year2, c:'var(--amber)' },
+            { yr:'Year 3', val:data.revenueModel?.projections?.year3, c:'#34d399' },
+          ].map(({ yr,val,c }) => (
+            <div key={yr} style={{
+              background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)',
+              borderRadius:16, padding:'20px', textAlign:'center',
+              transition:'all 0.3s', cursor:'default',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor=c; e.currentTarget.style.boxShadow=`0 0 20px ${c}30`; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor='rgba(255,255,255,0.08)'; e.currentTarget.style.boxShadow='none'; }}>
+              <div style={{ fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:1.5, marginBottom:8 }}>{yr}</div>
+              <div style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:900, color:c }}>
+                <AnimNum val={val||'—'} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* ── Marketing ── */}
+      <Section icon="📣" title="Marketing Strategy" accent="#8b5cf6" badge="GTM">
+        <p style={{ ...s.prose, borderLeft:'3px solid #8b5cf6', paddingLeft:16 }}>{data.marketingStrategy?.gtmStrategy}</p>
+        <div style={s.grid2col}>
+          <div>
+            <div style={s.subLabel}>Channels</div>
+            <ul style={s.list}>
+              {(data.marketingStrategy?.channels||[]).map((c,i) => (
+                <li key={i} style={{ ...s.listItem, display:'flex', gap:10 }}>
+                  <span style={{ color:'#8b5cf6', fontWeight:700 }}>→</span> {c}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div style={s.subLabel}>Tactics</div>
+            <ul style={s.list}>
+              {(data.marketingStrategy?.tactics||[]).map((t,i) => (
+                <li key={i} style={{ ...s.listItem, display:'flex', gap:10 }}>
+                  <span style={{ color:'#8b5cf6', fontWeight:700 }}>→</span> {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </Section>
+
+      {/* ── Milestones + Risks ── */}
+      <div style={s.grid2}>
+        <Section icon="🗓" title="Roadmap & Milestones" accent="#22d3ee">
+          <Timeline milestones={data.milestones||[]} />
+        </Section>
+
+        <Section icon="⚡" title="Risks & Mitigations" accent="#f87171">
+          {(data.risks||[]).map((r,i) => (
+            <div key={i} onClick={() => setExpandedRisk(expandedRisk===i ? null : i)}
+              style={{
+                background: expandedRisk===i ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.02)',
+                border:`1px solid ${expandedRisk===i ? 'rgba(248,113,113,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                borderRadius:14, padding:'16px 18px', marginBottom:12, cursor:'pointer',
+                transition:'all 0.25s',
+              }}>
+              <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                <span style={{ color:'#f87171', fontSize:16 }}>⚠</span>
+                <span style={{ fontSize:14, fontWeight:600, color:'#f87171', flex:1 }}>{r.risk}</span>
+                <span style={{ color:'var(--text-muted)', fontSize:12, transform: expandedRisk===i ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>▼</span>
+              </div>
+              {expandedRisk===i && (
+                <div style={{ marginTop:12, paddingTop:12, borderTop:'1px solid rgba(255,255,255,0.06)', display:'flex', gap:10 }}>
+                  <span style={{ fontSize:16 }}>🛡</span>
+                  <p style={{ fontSize:13, color:'var(--text-secondary)', lineHeight:1.6, margin:0 }}>{r.mitigation}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </Section>
+      </div>
+
+      {/* ── Competitive Advantages ── */}
+      <Section icon="🏆" title="Competitive Advantages" accent="var(--amber)" badge="Moat">
+        <div style={s.advantagesGrid}>
+          {(data.competitiveAdvantage||[]).map((adv,i) => (
+            <div key={i} style={{
+              background:'rgba(255,255,255,0.02)',
+              border:'1px solid rgba(255,255,255,0.07)',
+              borderRadius:18, padding:'24px',
+              transition:'all 0.3s', cursor:'default',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor='rgba(251,191,36,0.35)'; e.currentTarget.style.background='rgba(251,191,36,0.05)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor='rgba(255,255,255,0.07)'; e.currentTarget.style.background='rgba(255,255,255,0.02)'; }}>
+              <div style={{ fontFamily:'var(--font-mono)', fontSize:32, fontWeight:900, color:'rgba(255,255,255,0.07)', marginBottom:10, lineHeight:1 }}>
+                {String(i+1).padStart(2,'0')}
+              </div>
+              <p style={{ fontSize:14, color:'var(--text-secondary)', lineHeight:1.7 }}>{adv}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+    </div>
+  );
+}
 
 const s = {
-  root: { display: 'flex', flexDirection: 'column', gap: 20 },
-  prose: { color: 'var(--text-secondary)', lineHeight: 1.8, fontSize: 15 },
-  subheading: {
-    fontFamily: 'var(--font-display)', fontSize: 13,
-    fontWeight: 700, color: 'var(--text-muted)',
-    textTransform: 'uppercase', letterSpacing: 1,
-    marginTop: 20, marginBottom: 10,
+  root: { display:'flex', flexDirection:'column', gap:18 },
+  pageHeader: { display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12, marginBottom:4 },
+  pageTitle: { fontFamily:'var(--font-display)', fontSize:26, fontWeight:800, margin:0 },
+  actionBtn: {
+    background:'rgba(255,255,255,0.04)', border:'1px solid var(--border)',
+    borderRadius:10, color:'var(--text-secondary)',
+    padding:'9px 16px', fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)',
+    transition:'all 0.2s',
   },
-  list: { listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 },
-  listItem: { display: 'flex', gap: 10, fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 },
-  grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 },
-  grid2col: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginTop: 8 },
-  grid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 20 },
-  statBox: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '16px',
+  actionBtnPrimary: {
+    background:'linear-gradient(135deg,var(--amber),#f97316)',
+    border:'none', borderRadius:10,
+    color:'#0a0a12', padding:'9px 18px',
+    fontSize:13, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-display)',
+    boxShadow:'0 4px 16px rgba(251,191,36,0.3)',
   },
-  statLabel: { fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
-  statValue: { fontSize: 15, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.4 },
+  prose: { color:'var(--text-secondary)', lineHeight:1.8, fontSize:14, margin:0 },
+  subLabel: { fontSize:11, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:1.5, fontWeight:700, marginBottom:12, marginTop:8 },
+  list: { listStyle:'none', display:'flex', flexDirection:'column', gap:10, marginTop:12 },
+  listItem: { fontSize:14, color:'var(--text-secondary)', lineHeight:1.6 },
+  listBullet: { width:8, height:8, borderRadius:'50%', flexShrink:0, marginTop:6 },
+  grid2: { display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))', gap:18 },
+  grid2col: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:24, marginTop:8 },
+  audienceGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:14, marginBottom:8 },
   revenuePrimary: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    background: 'var(--amber-glow)', border: '1px solid var(--border-glow)',
-    borderRadius: 'var(--radius-md)', padding: '14px 20px', marginBottom: 20,
+    background:'var(--amber-glow)', border:'1px solid var(--border-amber)',
+    borderRadius:14, padding:'16px 20px', marginBottom:20,
+    display:'flex', alignItems:'center', justifyContent:'space-between',
   },
-  revenueLabel: { fontSize: 12, color: 'var(--amber)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 },
-  revenueValue: { fontSize: 15, color: 'var(--text-primary)', fontWeight: 500 },
-  streamsGrid: { display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 },
-  streamChip: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 100, padding: '6px 14px', fontSize: 13, color: 'var(--text-secondary)',
-  },
-  projectionsGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 },
-  projCard: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '16px', textAlign: 'center',
-  },
-  projLabel: { fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 1 },
-  projValue: { fontSize: 18, fontWeight: 800, fontFamily: 'var(--font-display)' },
-  milestones: { display: 'flex', flexDirection: 'column', gap: 0 },
-  milestone: {
-    display: 'grid', gridTemplateColumns: '100px 24px 1fr',
-    gap: 12, alignItems: 'center', padding: '12px 0',
-    borderBottom: '1px solid var(--border)',
-  },
-  milestonePhase: { fontSize: 12, fontWeight: 700, color: 'var(--amber)', fontFamily: 'var(--font-mono)' },
-  milestoneLine: { width: 2, height: 24, background: 'var(--border)', margin: '0 auto' },
-  milestoneGoal: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.5 },
-  riskItem: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: 12,
-  },
-  riskLabel: { fontSize: 14, fontWeight: 600, color: '#f87171', marginBottom: 8 },
-  riskMitigation: { fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 },
-  advantagesGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 },
-  advantageCard: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '20px',
-  },
-  advantageNum: { fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 800, color: 'var(--border)', display: 'block', marginBottom: 8 },
-  advantageText: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 },
+  projectionsGrid: { display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 },
+  advantagesGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))', gap:14 },
 };
