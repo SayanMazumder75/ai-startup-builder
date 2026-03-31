@@ -1,183 +1,297 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../utils/api';
 import ResultsPage from './ResultsPage';
+import { HeroScene3D } from '../components/Scene3D';
 
-const EXAMPLE_IDEAS = [
-  'An AI-powered meal planner that creates personalized recipes based on dietary restrictions and fridge contents',
-  'A marketplace connecting remote workers with local coworking spaces for flexible daily bookings',
-  'Mental health app that uses voice analysis to detect stress levels and recommend micro-interventions',
-  'SaaS platform for small restaurants to manage online orders, inventory, and staff scheduling',
+const EXAMPLES = [
+  'AI-powered meal planner that creates personalized recipes based on dietary restrictions and fridge contents',
+  'Marketplace connecting remote workers with local coworking spaces for flexible daily bookings',
+  'Mental health app using voice analysis to detect stress and recommend micro-interventions',
+  'SaaS platform for small restaurants to manage online orders, inventory and staff scheduling',
   'Peer-to-peer tool sharing app for neighborhoods to rent out equipment they rarely use',
 ];
+
+const STEPS = [
+  { icon:'🧠', text:'Analyzing your idea with AI...' },
+  { icon:'📋', text:'Crafting business strategy...' },
+  { icon:'🎨', text:'Designing brand identity...' },
+  { icon:'📊', text:'Building pitch deck...' },
+  { icon:'🌐', text:'Generating landing page...' },
+  { icon:'✨', text:'Finalizing your startup kit...' },
+];
+
+function AnimatedCounter({ target, suffix='' }) {
+  const [val, setVal] = useState(0);
+  const ref = useRef(null);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        let start = 0;
+        const step = target / 40;
+        const timer = setInterval(() => {
+          start = Math.min(start + step, target);
+          setVal(Math.round(start));
+          if (start >= target) clearInterval(timer);
+        }, 40);
+      }
+    }, { threshold: 0.3 });
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [target]);
+  return <span ref={ref}>{val}{suffix}</span>;
+}
 
 export default function Dashboard() {
   const { user, logout, token } = useAuth();
   const [idea, setIdea] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadStep, setLoadStep] = useState(0);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
-  const [savedProjects, setSavedProjects] = useState([]);
+  const [saved, setSaved] = useState([]);
   const [showProjects, setShowProjects] = useState(false);
+  const [charCount, setCharCount] = useState(0);
+  const textareaRef = useRef(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('savedProjects');
-    if (saved) setSavedProjects(JSON.parse(saved));
+    const s = localStorage.getItem('savedProjects');
+    if (s) setSaved(JSON.parse(s));
   }, []);
 
+  // Cycle loading steps
+  useEffect(() => {
+    if (!loading) { setLoadStep(0); return; }
+    const timer = setInterval(() => setLoadStep(p => (p + 1) % STEPS.length), 1800);
+    return () => clearInterval(timer);
+  }, [loading]);
+
   const handleGenerate = async () => {
-    if (!idea.trim() || idea.trim().length < 10) {
-      setError('Please describe your startup idea (at least 10 characters)');
-      return;
-    }
-    setError('');
-    setLoading(true);
+    if (!idea.trim() || idea.trim().length < 10) { setError('Please describe your idea (at least 10 characters)'); return; }
+    setError(''); setLoading(true);
     try {
       const data = await api.post('/generate', { idea: idea.trim() }, token);
-      const project = {
-        id: data.projectId,
-        idea: data.idea,
-        kit: data.kit,
-        createdAt: data.generatedAt,
-      };
+      const project = { id: data.projectId, idea: data.idea, kit: data.kit, createdAt: data.generatedAt };
       setResult(project);
-
-      // Save to local storage
-      const updated = [project, ...savedProjects.filter(p => p.id !== project.id)].slice(0, 10);
-      setSavedProjects(updated);
+      const updated = [project, ...saved.filter(p => p.id !== project.id)].slice(0, 10);
+      setSaved(updated);
       localStorage.setItem('savedProjects', JSON.stringify(updated));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
-  if (result) {
-    return <ResultsPage project={result} onBack={() => setResult(null)} />;
-  }
+  if (result) return <ResultsPage project={result} onBack={() => setResult(null)} />;
 
   return (
     <div style={s.root}>
-      {/* Nav */}
+      {/* ── Nav ────────────────────────────────────────────────────── */}
       <nav style={s.nav}>
-        <div style={s.navLogo}>
-          <span style={{ fontSize: 20 }}>⚡</span>
-          <span style={s.navBrand}>AI Startup Builder</span>
+        <div style={s.navLeft}>
+          <div style={s.navLogo}>
+            <div style={s.navLogoIcon}>⚡</div>
+            <span style={s.navBrand}>AI Startup Builder</span>
+          </div>
+          <div className="badge badge-green" style={{ gap:6 }}>
+            <span style={{ width:6,height:6,borderRadius:'50%',background:'var(--green)',
+              boxShadow:'0 0 6px var(--green)',display:'inline-block' }} />
+            Live
+          </div>
         </div>
         <div style={s.navRight}>
-          <button onClick={() => setShowProjects(!showProjects)} style={s.navBtn}>
-            📁 Projects ({savedProjects.length})
-          </button>
-          <div style={s.avatar}>{user?.name?.[0]?.toUpperCase() || 'U'}</div>
-          <button onClick={logout} style={s.logoutBtn}>Sign out</button>
+          {saved.length > 0 && (
+            <button onClick={() => setShowProjects(!showProjects)} style={s.navBtn}>
+              📁 Projects <span style={s.navBadge}>{saved.length}</span>
+            </button>
+          )}
+          <div style={s.navAvatar}>
+            <div style={s.avatarRing} />
+            <span style={s.avatarLetter}>{user?.name?.[0]?.toUpperCase()||'U'}</span>
+          </div>
+          <span style={s.navUser}>{user?.name?.split(' ')[0]}</span>
+          <button onClick={logout} style={s.navLogout}>Sign out</button>
         </div>
       </nav>
 
-      {/* Saved projects panel */}
-      {showProjects && savedProjects.length > 0 && (
-        <div style={s.projectsPanel}>
-          <h3 style={s.projectsTitle}>Saved Projects</h3>
-          <div style={s.projectsList}>
-            {savedProjects.map(p => (
-              <button key={p.id} style={s.projectItem} onClick={() => { setResult(p); setShowProjects(false); }}>
-                <div style={s.projectIdea}>{p.idea}</div>
-                <div style={s.projectDate}>{new Date(p.createdAt).toLocaleDateString()}</div>
+      {/* ── Projects Drawer ─────────────────────────────────────────── */}
+      {showProjects && (
+        <div style={s.projectsDrawer} className="animate-fadeInUp">
+          <div style={s.drawerHeader}>
+            <span style={s.drawerTitle}>📁 Your Projects</span>
+            <button onClick={() => setShowProjects(false)} style={s.drawerClose}>✕</button>
+          </div>
+          <div style={s.drawerList}>
+            {saved.map(p => (
+              <button key={p.id} style={s.drawerItem}
+                onClick={() => { setResult(p); setShowProjects(false); }}>
+                <div style={s.drawerItemDot} />
+                <div>
+                  <div style={s.drawerItemText}>{p.idea.slice(0,70)}...</div>
+                  <div style={s.drawerItemDate}>{new Date(p.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
+                </div>
+                <span style={s.drawerItemArrow}>→</span>
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* Hero */}
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div style={s.hero}>
-        <div style={s.orb1} />
-        <div style={s.orb2} />
-
-        <div style={s.badge}>✨ Powered by AI</div>
-
-        <h1 style={s.h1}>
-          Turn your idea into a<br />
-          <span className="gradient-text">complete startup kit</span>
-        </h1>
-
-        <p style={s.tagline}>
-          Generate landing page, business plan, branding & pitch deck<br />
-          in under 60 seconds — powered by Claude.
-        </p>
-
-        {/* Input */}
-        <div style={s.inputWrapper}>
-          <textarea
-            value={idea}
-            onChange={e => { setIdea(e.target.value); setError(''); }}
-            placeholder="Describe your startup idea... e.g. 'An app that helps remote teams stay connected through virtual water cooler moments and async video check-ins'"
-            style={s.textarea}
-            rows={4}
-            onFocus={e => e.target.style.borderColor = '#fbbf24'}
-            onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'}
-            disabled={loading}
-          />
-          <div style={s.charCount}>{idea.length}/500</div>
+        {/* 3D scene */}
+        <div style={s.scene3dWrap}>
+          <HeroScene3D style={{ borderRadius:'50%' }} />
         </div>
 
-        {error && <div style={s.error}>⚠ {error}</div>}
+        {/* Content */}
+        <div style={s.heroContent}>
+          <div className="badge badge-amber animate-fadeInUp" style={{ marginBottom:28 }}>
+            ✨ Powered by Groq AI · Llama 3.3 70B
+          </div>
 
-        <button
-          onClick={handleGenerate}
-          disabled={loading || !idea.trim()}
-          style={loading || !idea.trim() ? { ...s.generateBtn, opacity: 0.6, cursor: 'not-allowed' } : s.generateBtn}
-        >
-          {loading ? (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center' }}>
-              <span style={s.spinner} />
-              Generating your startup kit...
-            </span>
-          ) : (
-            '🚀 Generate Startup Kit'
-          )}
-        </button>
+          <h1 style={s.heroH1} className="animate-fadeInUp">
+            Turn any idea into a<br />
+            <span className="gradient-text-animated">complete startup</span>
+          </h1>
 
-        {loading && (
-          <div style={s.loadingSteps}>
-            {['Analyzing your idea...', 'Building business plan...', 'Designing branding...', 'Creating pitch deck...'].map((step, i) => (
-              <div key={i} style={{ ...s.step, animationDelay: `${i * 0.8}s` }}>
-                <span style={s.stepDot} /> {step}
+          <p style={s.heroSub} className="animate-fadeInUp">
+            Landing page · Business plan · Brand identity · Pitch deck<br />
+            All generated in under <strong style={{color:'var(--amber)'}}>60 seconds</strong>.
+          </p>
+
+          {/* Stats */}
+          <div style={s.statsRow} className="animate-fadeInUp">
+            {[
+              { num:2400, suffix:'+', label:'Kits Generated' },
+              { num:60,   suffix:'s', label:'Avg. Time' },
+              { num:4,    suffix:'',  label:'Deliverables' },
+            ].map(({ num, suffix, label }) => (
+              <div key={label} style={s.statItem}>
+                <div style={s.statNum}><AnimatedCounter target={num} suffix={suffix} /></div>
+                <div style={s.statLabel}>{label}</div>
               </div>
             ))}
           </div>
-        )}
-
-        {/* Example ideas */}
-        {!loading && (
-          <div style={s.examples}>
-            <p style={s.examplesLabel}>💡 Try an example:</p>
-            <div style={s.examplesList}>
-              {EXAMPLE_IDEAS.slice(0, 3).map((ex, i) => (
-                <button key={i} style={s.exampleChip} onClick={() => setIdea(ex)}>
-                  {ex.slice(0, 60)}...
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Features grid */}
+      {/* ── Input Section ───────────────────────────────────────────── */}
+      <div style={s.inputSection}>
+        <div style={s.inputCard} className="glass-card">
+          {/* Header */}
+          <div style={s.inputCardHeader}>
+            <span style={s.inputCardTitle}>Describe your startup idea</span>
+            <span style={{ ...s.inputCharCount, color: charCount > 450 ? '#f87171' : 'var(--text-muted)' }}>
+              {charCount}/500
+            </span>
+          </div>
+
+          {/* Textarea */}
+          <div style={s.textareaWrap}>
+            <textarea
+              ref={textareaRef}
+              value={idea}
+              disabled={loading}
+              onChange={e => { setIdea(e.target.value); setCharCount(e.target.value.length); setError(''); }}
+              placeholder="e.g. An AI-powered fitness app that creates personalized workout plans based on your schedule, fitness level, and goals — with real-time form correction using your phone camera..."
+              style={s.textarea}
+              rows={4}
+              maxLength={500}
+            />
+            {/* Sparkle decoration */}
+            <div style={s.textareaDecor}>✦</div>
+          </div>
+
+          {error && (
+            <div style={s.errorBox} className="animate-fadeInUp">
+              <span>⚠</span> {error}
+            </div>
+          )}
+
+          {/* Generate button */}
+          <button
+            onClick={handleGenerate}
+            disabled={loading || !idea.trim()}
+            style={loading || !idea.trim()
+              ? { ...s.genBtn, opacity:0.55, cursor:'not-allowed', boxShadow:'none' }
+              : s.genBtn}
+          >
+            {loading ? (
+              <span style={{ display:'flex', alignItems:'center', gap:12, justifyContent:'center' }}>
+                <span style={s.btnSpinner} />
+                <span>{STEPS[loadStep].icon} {STEPS[loadStep].text}</span>
+              </span>
+            ) : '🚀 Generate Startup Kit'}
+          </button>
+
+          {/* Loading progress */}
+          {loading && (
+            <div style={s.progressWrap} className="animate-fadeInUp">
+              <div style={s.progressTrack}>
+                <div style={{
+                  ...s.progressBar,
+                  width: `${((loadStep + 1) / STEPS.length) * 100}%`,
+                  transition:'width 1.8s ease',
+                }} />
+              </div>
+              <div style={s.progressSteps}>
+                {STEPS.map((st, i) => (
+                  <div key={i} style={{
+                    ...s.progressStep,
+                    opacity: i <= loadStep ? 1 : 0.3,
+                    color: i === loadStep ? 'var(--amber)' : 'var(--text-muted)',
+                    transform: i === loadStep ? 'scale(1.05)' : 'scale(1)',
+                  }}>
+                    {st.icon}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Examples */}
+          {!loading && (
+            <div style={s.examplesWrap}>
+              <span style={s.examplesLabel}>💡 Quick examples:</span>
+              <div style={s.examplesList}>
+                {EXAMPLES.slice(0,3).map((ex, i) => (
+                  <button key={i} style={s.exampleChip}
+                    onClick={() => { setIdea(ex); setCharCount(ex.length); }}>
+                    {ex.slice(0,55)}…
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── What You Get ─────────────────────────────────────────────── */}
       {!loading && (
         <div style={s.features}>
-          {[
-            { icon: '🌐', label: 'Landing Page', desc: 'Hero, features, pricing & testimonials' },
-            { icon: '📋', label: 'Business Plan', desc: 'Problem, solution, market & revenue model' },
-            { icon: '🎨', label: 'Brand Identity', desc: 'Name, colors, logo concept & voice' },
-            { icon: '📊', label: 'Pitch Deck', desc: '10 investor-ready slides with speaker notes' },
-          ].map((f, i) => (
-            <div key={i} style={s.featureCard}>
-              <span style={s.featureIcon}>{f.icon}</span>
-              <strong style={s.featureLabel}>{f.label}</strong>
-              <span style={s.featureDesc}>{f.desc}</span>
-            </div>
-          ))}
+          <p className="section-eyebrow" style={{ textAlign:'center' }}>What you get</p>
+          <div style={s.featureGrid}>
+            {[
+              { icon:'🌐', color:0xfbbf24, title:'Landing Page', desc:'Hero section, features, pricing, testimonials & FAQ — ready to deploy', tag:'React + Tailwind code' },
+              { icon:'📋', color:0x8b5cf6, title:'Business Plan', desc:'Problem, solution, market size, revenue model, milestones & risk analysis', tag:'Investor-ready' },
+              { icon:'🎨', color:0x22d3ee, title:'Brand Identity', desc:'4 name options, full color palette with hex codes, logo concept & typography', tag:'Complete kit' },
+              { icon:'📊', color:0x34d399, title:'Pitch Deck', desc:'10 slides with bullet points, speaker notes & investor FAQ', tag:'Fundraise-ready' },
+            ].map((f, i) => (
+              <div key={i} style={s.featureCard} className="glass-card perspective-card animate-fadeInUp"
+                style2={{ animationDelay:`${i*0.1}s` }}>
+                <div style={{ ...s.featureIconBg, background:`rgba(${(f.color>>16)&255},${(f.color>>8)&255},${(f.color&255)},0.12)`}}>
+                  <span style={s.featureIcon}>{f.icon}</span>
+                </div>
+                <div className="badge" style={{
+                  background:`rgba(${(f.color>>16)&255},${(f.color>>8)&255},${(f.color&255)},0.1)`,
+                  border:`1px solid rgba(${(f.color>>16)&255},${(f.color>>8)&255},${(f.color&255)},0.3)`,
+                  color:`rgb(${(f.color>>16)&255},${(f.color>>8)&255},${(f.color&255)})`,
+                  marginBottom:12, fontSize:11,
+                }}>{f.tag}</div>
+                <h3 style={s.featureTitle}>{f.title}</h3>
+                <p style={s.featureDesc}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -185,163 +299,208 @@ export default function Dashboard() {
 }
 
 const s = {
-  root: { minHeight: '100vh', background: 'var(--bg-void)', position: 'relative' },
+  root: { minHeight:'100vh', background:'var(--bg-void)' },
+
+  // Nav
   nav: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '16px 32px',
-    background: 'rgba(10,10,18,0.8)', backdropFilter: 'blur(20px)',
-    borderBottom: '1px solid var(--border)',
-    position: 'sticky', top: 0, zIndex: 100,
+    display:'flex', alignItems:'center', justifyContent:'space-between',
+    padding:'14px 28px',
+    background:'rgba(6,6,15,0.85)', backdropFilter:'blur(24px)',
+    borderBottom:'1px solid var(--border)',
+    position:'sticky', top:0, zIndex:100,
   },
-  navLogo: { display: 'flex', alignItems: 'center', gap: 10 },
-  navBrand: { fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700 },
-  navRight: { display: 'flex', alignItems: 'center', gap: 12 },
+  navLeft: { display:'flex', alignItems:'center', gap:14 },
+  navLogo: { display:'flex', alignItems:'center', gap:10 },
+  navLogoIcon: {
+    width:34, height:34, borderRadius:10,
+    background:'linear-gradient(135deg,#fbbf24,#f97316)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    fontSize:16, boxShadow:'0 3px 12px rgba(251,191,36,0.4)',
+  },
+  navBrand: { fontFamily:'var(--font-display)', fontSize:16, fontWeight:700 },
+  navRight: { display:'flex', alignItems:'center', gap:12 },
   navBtn: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)',
-    padding: '8px 14px', fontSize: 13, cursor: 'pointer',
-    fontFamily: 'var(--font-body)',
+    display:'flex', alignItems:'center', gap:8,
+    background:'rgba(255,255,255,0.04)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-md)', color:'var(--text-secondary)',
+    padding:'8px 14px', fontSize:13, cursor:'pointer',
+    fontFamily:'var(--font-body)', transition:'all 0.2s',
   },
-  avatar: {
-    width: 34, height: 34, borderRadius: '50%',
-    background: 'linear-gradient(135deg, #fbbf24, #f97316)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontWeight: 700, fontSize: 14, color: '#0a0a12',
+  navBadge: {
+    background:'var(--amber)', color:'#0a0a12',
+    borderRadius:100, padding:'1px 7px', fontSize:11, fontWeight:800,
   },
-  logoutBtn: {
-    background: 'none', border: 'none', color: 'var(--text-muted)',
-    fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font-body)',
+  navAvatar: { position:'relative', width:34, height:34 },
+  avatarRing: {
+    position:'absolute', inset:-2, borderRadius:'50%',
+    background:'linear-gradient(135deg,var(--amber),var(--violet))',
+    animation:'spinSlow 4s linear infinite',
   },
-  projectsPanel: {
-    background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)',
-    padding: '20px 32px',
+  avatarLetter: {
+    position:'absolute', inset:2, borderRadius:'50%',
+    background:'var(--bg-card)',
+    display:'flex', alignItems:'center', justifyContent:'center',
+    fontWeight:800, fontSize:14, color:'var(--amber)',
   },
-  projectsTitle: {
-    fontFamily: 'var(--font-display)', fontSize: 16, marginBottom: 12,
+  navUser: { fontSize:14, color:'var(--text-secondary)' },
+  navLogout: {
+    background:'none', border:'none', color:'var(--text-muted)',
+    fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)',
   },
-  projectsList: { display: 'flex', gap: 12, flexWrap: 'wrap' },
-  projectItem: {
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '12px 16px',
-    cursor: 'pointer', textAlign: 'left', maxWidth: 280,
-    fontFamily: 'var(--font-body)',
+
+  // Projects drawer
+  projectsDrawer: {
+    background:'var(--bg-surface)', borderBottom:'1px solid var(--border)',
+    padding:'16px 28px',
   },
-  projectIdea: { fontSize: 13, color: 'var(--text-primary)', marginBottom: 4, lineClamp: 2 },
-  projectDate: { fontSize: 11, color: 'var(--text-muted)' },
+  drawerHeader: { display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 },
+  drawerTitle: { fontFamily:'var(--font-display)', fontSize:15, fontWeight:700 },
+  drawerClose: {
+    background:'none', border:'none', color:'var(--text-muted)',
+    fontSize:18, cursor:'pointer',
+  },
+  drawerList: { display:'flex', gap:10, flexWrap:'wrap' },
+  drawerItem: {
+    display:'flex', alignItems:'center', gap:12,
+    background:'var(--bg-card)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-md)', padding:'12px 16px',
+    cursor:'pointer', textAlign:'left', maxWidth:340,
+    fontFamily:'var(--font-body)', transition:'all 0.2s',
+  },
+  drawerItemDot: { width:8, height:8, borderRadius:'50%', background:'var(--amber)', flexShrink:0 },
+  drawerItemText: { fontSize:13, color:'var(--text-primary)', lineHeight:1.4, marginBottom:3 },
+  drawerItemDate: { fontSize:11, color:'var(--text-muted)' },
+  drawerItemArrow: { color:'var(--text-muted)', marginLeft:'auto', flexShrink:0 },
+
+  // Hero
   hero: {
-    maxWidth: 760, margin: '0 auto',
-    padding: '80px 24px 60px',
-    textAlign: 'center', position: 'relative',
-    overflow: 'hidden',
+    maxWidth:900, margin:'0 auto',
+    padding:'60px 24px 20px',
+    display:'grid', gridTemplateColumns:'1fr 1fr',
+    gap:40, alignItems:'center',
+    position:'relative',
   },
-  orb1: {
-    position: 'absolute', top: -100, right: -100,
-    width: 500, height: 500, borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(251,191,36,0.07) 0%, transparent 70%)',
-    pointerEvents: 'none',
+  scene3dWrap: {
+    width:'100%', aspectRatio:'1',
+    maxWidth:380, margin:'0 auto',
+    filter:'drop-shadow(0 0 60px rgba(251,191,36,0.15))',
   },
-  orb2: {
-    position: 'absolute', bottom: -100, left: -100,
-    width: 400, height: 400, borderRadius: '50%',
-    background: 'radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%)',
-    pointerEvents: 'none',
+  heroContent: { display:'flex', flexDirection:'column', gap:0 },
+  heroH1: {
+    fontFamily:'var(--font-display)',
+    fontSize:'clamp(32px,4vw,52px)',
+    fontWeight:900, lineHeight:1.15,
+    marginBottom:20,
   },
-  badge: {
-    display: 'inline-block',
-    background: 'var(--amber-dim)',
-    border: '1px solid var(--amber)',
-    color: 'var(--amber)',
-    borderRadius: 100, padding: '6px 16px',
-    fontSize: 13, fontWeight: 600,
-    marginBottom: 32, letterSpacing: 0.5,
+  heroSub: {
+    fontSize:17, color:'var(--text-secondary)',
+    lineHeight:1.75, marginBottom:32,
   },
-  h1: {
-    fontFamily: 'var(--font-display)',
-    fontSize: 'clamp(36px, 6vw, 60px)',
-    fontWeight: 800, lineHeight: 1.15,
-    marginBottom: 20, color: 'var(--text-primary)',
+  statsRow: { display:'flex', gap:32 },
+  statItem: {},
+  statNum: {
+    fontFamily:'var(--font-display)', fontSize:28, fontWeight:900,
+    color:'var(--amber)', lineHeight:1,
   },
-  tagline: {
-    fontSize: 18, color: 'var(--text-secondary)',
-    lineHeight: 1.7, marginBottom: 48,
+  statLabel: { fontSize:12, color:'var(--text-muted)', marginTop:4 },
+
+  // Input section
+  inputSection: { maxWidth:800, margin:'0 auto', padding:'0 24px 48px' },
+  inputCard: {
+    borderRadius:'var(--r-xl)', padding:'32px',
+    border:'1px solid var(--border-bright)',
   },
-  inputWrapper: { position: 'relative', marginBottom: 8 },
+  inputCardHeader: {
+    display:'flex', justifyContent:'space-between',
+    alignItems:'center', marginBottom:14,
+  },
+  inputCardTitle: {
+    fontFamily:'var(--font-display)', fontSize:16, fontWeight:700,
+    color:'var(--text-primary)',
+  },
+  inputCharCount: { fontSize:12, fontFamily:'var(--font-mono)' },
+  textareaWrap: { position:'relative', marginBottom:16 },
   textarea: {
-    width: '100%', background: 'var(--bg-card)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 'var(--radius-lg)',
-    color: 'var(--text-primary)',
-    padding: '20px 24px',
-    fontSize: 16, outline: 'none',
-    resize: 'none', transition: 'border-color 0.2s',
-    fontFamily: 'var(--font-body)', lineHeight: 1.6,
-    boxSizing: 'border-box',
+    width:'100%', background:'rgba(255,255,255,0.03)',
+    border:'1px solid var(--border)',
+    borderRadius:'var(--r-lg)', color:'var(--text-primary)',
+    padding:'18px 20px', fontSize:15, outline:'none',
+    resize:'none', lineHeight:1.7,
+    fontFamily:'var(--font-body)', transition:'border-color 0.2s, box-shadow 0.2s',
+    boxSizing:'border-box',
   },
-  charCount: {
-    textAlign: 'right', fontSize: 12, color: 'var(--text-muted)',
-    marginTop: 4, marginBottom: 4,
+  textareaDecor: {
+    position:'absolute', top:12, right:14,
+    fontSize:18, color:'var(--amber)', opacity:0.4, pointerEvents:'none',
   },
-  error: {
-    background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
-    borderRadius: 'var(--radius-sm)', color: '#f87171',
-    padding: '10px 16px', fontSize: 14, marginBottom: 16,
+  errorBox: {
+    background:'rgba(248,113,113,0.08)', border:'1px solid rgba(248,113,113,0.2)',
+    borderRadius:'var(--r-sm)', color:'#fca5a5',
+    padding:'10px 16px', fontSize:13, marginBottom:16,
+    display:'flex', alignItems:'center', gap:8,
   },
-  generateBtn: {
-    width: '100%',
-    background: 'linear-gradient(135deg, #fbbf24 0%, #f97316 100%)',
-    color: '#0a0a12', border: 'none',
-    borderRadius: 'var(--radius-lg)',
-    padding: '18px', fontSize: 18,
-    fontWeight: 800, cursor: 'pointer',
-    fontFamily: 'var(--font-display)',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    boxShadow: '0 8px 32px rgba(251,191,36,0.3)',
-    marginBottom: 24,
+  genBtn: {
+    width:'100%',
+    background:'linear-gradient(135deg,#fbbf24 0%,#f97316 50%,#ef4444 100%)',
+    backgroundSize:'200% 200%',
+    border:'none', borderRadius:'var(--r-lg)',
+    color:'#05050a', padding:'18px',
+    fontSize:17, fontWeight:900, cursor:'pointer',
+    fontFamily:'var(--font-display)',
+    boxShadow:'0 8px 40px rgba(251,191,36,0.4), 0 0 80px rgba(249,115,22,0.15)',
+    transition:'all 0.3s',
+    animation:'gradientShift 4s ease infinite',
+    marginBottom:20,
   },
-  spinner: {
-    width: 20, height: 20,
-    border: '3px solid rgba(0,0,0,0.2)',
-    borderTopColor: '#0a0a12', borderRadius: '50%',
-    display: 'inline-block', animation: 'spin 0.7s linear infinite',
+  btnSpinner: {
+    width:20, height:20,
+    border:'3px solid rgba(0,0,0,0.2)',
+    borderTopColor:'#0a0a12', borderRadius:'50%',
+    display:'inline-block', animation:'spin 0.7s linear infinite',
+    flexShrink:0,
   },
-  loadingSteps: {
-    display: 'flex', flexDirection: 'column', gap: 12,
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: 32,
+  progressWrap: { marginBottom:20 },
+  progressTrack: {
+    height:3, background:'var(--border)',
+    borderRadius:2, marginBottom:14, overflow:'hidden',
   },
-  step: {
-    display: 'flex', alignItems: 'center', gap: 12,
-    color: 'var(--text-secondary)', fontSize: 14,
-    animation: 'fadeIn 0.5s ease both',
+  progressBar: {
+    height:'100%',
+    background:'linear-gradient(90deg,var(--amber),var(--rose),var(--violet))',
+    borderRadius:2, transition:'width 1.8s ease',
   },
-  stepDot: {
-    width: 8, height: 8, borderRadius: '50%',
-    background: 'var(--amber)', display: 'inline-block',
-    animation: 'pulse-glow 1.5s ease-in-out infinite',
-  },
-  examples: { marginTop: 8 },
-  examplesLabel: { fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 },
-  examplesList: { display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' },
+  progressSteps: { display:'flex', justifyContent:'space-between' },
+  progressStep: { fontSize:18, transition:'all 0.3s' },
+  examplesWrap: {},
+  examplesLabel: { fontSize:12, color:'var(--text-muted)', display:'block', marginBottom:10 },
+  examplesList: { display:'flex', gap:8, flexWrap:'wrap' },
   exampleChip: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 100, color: 'var(--text-secondary)',
-    padding: '8px 16px', fontSize: 13, cursor: 'pointer',
-    fontFamily: 'var(--font-body)', textAlign: 'left',
-    transition: 'border-color 0.2s, color 0.2s',
-    maxWidth: 280,
+    background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)',
+    borderRadius:100, color:'var(--text-secondary)',
+    padding:'7px 14px', fontSize:12, cursor:'pointer',
+    fontFamily:'var(--font-body)', transition:'all 0.2s', maxWidth:260,
+    textAlign:'left',
   },
-  features: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: 16, maxWidth: 900, margin: '0 auto 80px', padding: '0 24px',
+
+  // Features
+  features: { maxWidth:900, margin:'0 auto', padding:'0 24px 80px' },
+  featureGrid: {
+    display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(190px, 1fr))',
+    gap:16, marginTop:20,
   },
   featureCard: {
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', padding: '24px',
-    display: 'flex', flexDirection: 'column', gap: 8,
-    animation: 'fadeIn 0.5s ease both',
+    borderRadius:'var(--r-lg)', padding:'24px',
+    display:'flex', flexDirection:'column', gap:0,
+    background:'rgba(255,255,255,0.02)',
+    border:'1px solid var(--border)',
+    cursor:'default',
   },
-  featureIcon: { fontSize: 28 },
-  featureLabel: { fontFamily: 'var(--font-display)', fontSize: 15, color: 'var(--text-primary)' },
-  featureDesc: { fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.5 },
+  featureIconBg: {
+    width:52, height:52, borderRadius:14,
+    display:'flex', alignItems:'center', justifyContent:'center',
+    marginBottom:16,
+  },
+  featureIcon: { fontSize:24 },
+  featureTitle: { fontFamily:'var(--font-display)', fontSize:16, fontWeight:700, marginBottom:8 },
+  featureDesc: { fontSize:13, color:'var(--text-secondary)', lineHeight:1.6 },
 };

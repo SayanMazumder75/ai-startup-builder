@@ -1,22 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-const SLIDE_COLORS = [
-  '#fbbf24','#f97316','#ef4444','#8b5cf6','#22d3ee',
-  '#34d399','#fbbf24','#f97316','#a78bfa','#10b981',
+const SLIDE_THEMES = [
+  { bg:'linear-gradient(135deg,#05050a 0%,#1a0a00 100%)', accent:'#fbbf24' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#100020 100%)', accent:'#8b5cf6' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#001a1a 100%)', accent:'#22d3ee' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#001a0a 100%)', accent:'#34d399' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#1a0005 100%)', accent:'#fb7185' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#0a0a1a 100%)', accent:'#a78bfa' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#1a0a00 100%)', accent:'#fcd34d' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#0a001a 100%)', accent:'#c084fc' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#001a10 100%)', accent:'#6ee7b7' },
+  { bg:'linear-gradient(135deg,#05050a 0%,#1a0500 100%)', accent:'#f97316' },
 ];
 
 export default function PitchDeckTab({ data, branding }) {
-  const [activeSlide, setActiveSlide] = useState(0);
-  const [showNotes, setShowNotes] = useState(false);
+  const [active, setActive] = useState(0);
+  const [notes, setNotes] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  if (!data) return <Empty />;
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') setActive(p => Math.min((data?.slides?.length||0)-1, p+1));
+      if (e.key === 'ArrowLeft') setActive(p => Math.max(0, p-1));
+      if (e.key === 'Escape') setIsFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [data]);
 
-  const slides = data.slides || [];
-  const slide = slides[activeSlide];
+  if (!data?.slides?.length) return <div style={{ textAlign:'center',padding:60,color:'var(--text-muted)' }}>No pitch deck data</div>;
+
+  const slides = data.slides;
+  const slide = slides[active];
+  const theme = SLIDE_THEMES[active % SLIDE_THEMES.length];
   const primaryName = branding?.nameOptions?.[0]?.name || 'Startup';
   const tagline = branding?.tagline || '';
-  const primaryColor = branding?.colorPalette?.primary?.hex || '#fbbf24';
-  // const accentColor = branding?.colorPalette?.accent?.hex || '#f97316';
 
   return (
     <div style={s.root}>
@@ -24,274 +42,333 @@ export default function PitchDeckTab({ data, branding }) {
       <div style={s.header}>
         <div>
           <h2 style={s.title}>📊 Pitch Deck</h2>
-          <p style={s.subtitle}>{slides.length} investor-ready slides</p>
+          <p style={s.subtitle}>{slides.length} investor-ready slides · Use ← → arrow keys to navigate</p>
         </div>
-        <button onClick={() => setShowNotes(!showNotes)} style={showNotes ? { ...s.notesBtn, ...s.notesBtnActive } : s.notesBtn}>
-          💬 {showNotes ? 'Hide' : 'Show'} Speaker Notes
-        </button>
+        <div style={s.headerActions}>
+          <button onClick={() => setNotes(!notes)}
+            style={notes ? {...s.headerBtn,...s.headerBtnActive} : s.headerBtn}>
+            💬 Speaker Notes
+          </button>
+          <button onClick={() => setIsFullscreen(!isFullscreen)} style={s.headerBtn}>
+            {isFullscreen ? '⊠ Exit' : '⛶ Fullscreen'}
+          </button>
+        </div>
       </div>
 
-      <div style={s.layout}>
-        {/* Slide thumbnails sidebar */}
-        <div style={s.sidebar}>
-          {slides.map((sl, i) => (
-            <button
-              key={i}
-              onClick={() => setActiveSlide(i)}
-              style={activeSlide === i ? { ...s.thumb, ...s.thumbActive } : s.thumb}
-            >
-              <div style={{ ...s.thumbNum, background: SLIDE_COLORS[i % SLIDE_COLORS.length], color: '#0a0a12' }}>
-                {sl.number}
-              </div>
-              <div style={s.thumbTitle}>{sl.title}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Main slide view */}
-        <div style={s.mainArea}>
-          {slide && (
-            <>
-              <div style={s.slideContainer}>
-                {/* Slide */}
-                <div style={{
-                  ...s.slide,
-                  background: `linear-gradient(135deg, #05050a 0%, #0f0f1a 100%)`,
-                }}>
-                  {/* Slide header bar */}
-                  <div style={{ ...s.slideBar, background: SLIDE_COLORS[activeSlide % SLIDE_COLORS.length] }} />
-
-                  {/* Slide number */}
-                  <div style={{ ...s.slideNumBadge, color: SLIDE_COLORS[activeSlide % SLIDE_COLORS.length] }}>
-                    {String(slide.number).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
-                  </div>
-
-                  {/* Slide title */}
-                  <h2 style={{ ...s.slideTitle, color: SLIDE_COLORS[activeSlide % SLIDE_COLORS.length] }}>
-                    {slide.title}
-                  </h2>
-
-                  {/* Special treatment for title slide */}
-                  {activeSlide === 0 ? (
-                    <div style={s.titleSlideContent}>
-                      <div style={{ ...s.companyName, color: primaryColor }}>{primaryName}</div>
-                      <div style={s.companyTagline}>{tagline}</div>
-                      {(slide.content || []).slice(1).map((line, i) => (
-                        <div key={i} style={s.titleMeta}>{line}</div>
-                      ))}
+      <div style={isFullscreen ? s.fullscreen : s.layout}>
+        {/* Sidebar thumbnails */}
+        {!isFullscreen && (
+          <div style={s.sidebar}>
+            <div style={s.sidebarInner}>
+              {slides.map((sl, i) => {
+                const t = SLIDE_THEMES[i % SLIDE_THEMES.length];
+                return (
+                  <button key={i} onClick={() => setActive(i)}
+                    style={active===i ? {...s.thumb,...s.thumbActive} : s.thumb}>
+                    <div style={{ ...s.thumbMini, background:t.bg, borderColor: active===i ? t.accent : 'transparent' }}>
+                      <div style={{ ...s.thumbNum, color:t.accent }}>
+                        {String(i+1).padStart(2,'0')}
+                      </div>
+                      <div style={s.thumbBars}>
+                        <div style={{ ...s.thumbBar, background:t.accent, width:'80%' }} />
+                        <div style={{ ...s.thumbBar, background:`${t.accent}60`, width:'60%' }} />
+                        <div style={{ ...s.thumbBar, background:`${t.accent}40`, width:'70%' }} />
+                      </div>
                     </div>
-                  ) : (
-                    <ul style={s.bulletList}>
-                      {(slide.content || []).map((point, i) => (
-                        <li key={i} style={s.bulletItem}>
-                          <span style={{ ...s.bullet, background: SLIDE_COLORS[activeSlide % SLIDE_COLORS.length] }} />
-                          <span style={s.bulletText}>{point}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                    <span style={{ ...s.thumbLabel, color: active===i ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                      {sl.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
-                  {/* Bottom branding */}
-                  <div style={s.slideBranding}>
-                    <span style={{ color: primaryColor, fontWeight: 700 }}>{primaryName}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
-                    <span style={{ color: 'rgba(255,255,255,0.3)' }}>{tagline}</span>
+        {/* Main slide */}
+        <div style={s.main}>
+          {/* Slide */}
+          <div style={{ ...s.slide, background: theme.bg }} className="animate-fadeInScale">
+            {/* Top accent bar */}
+            <div style={{ ...s.slideAccentBar, background: theme.accent }} />
+
+            {/* Slide number */}
+            <div style={{ ...s.slideCounter, color: `${theme.accent}80` }}>
+              {String(active+1).padStart(2,'0')} / {String(slides.length).padStart(2,'0')}
+            </div>
+
+            {/* Slide content */}
+            {active === 0 ? (
+              /* Title slide special layout */
+              <div style={s.titleSlide}>
+                <div style={{ ...s.titleSlideGlow, background:`radial-gradient(circle, ${theme.accent}15 0%, transparent 70%)` }} />
+                <div style={{ ...s.titleBadge, background:`${theme.accent}18`, border:`1px solid ${theme.accent}40`, color:theme.accent }}>
+                  Investor Presentation
+                </div>
+                <h1 style={{ ...s.titleName, color: theme.accent }}>{primaryName}</h1>
+                <p style={s.titleTagline}>{tagline}</p>
+                {(slide.content || []).slice(1).map((line, i) => (
+                  <p key={i} style={s.titleMeta}>{line}</p>
+                ))}
+                <div style={s.titleFooter}>
+                  <div style={{ ...s.titleYear, color:`${theme.accent}60` }}>
+                    {new Date().getFullYear()}
                   </div>
                 </div>
-
-                {/* Speaker notes */}
-                {showNotes && slide.speakerNotes && (
-                  <div style={s.notesBox}>
-                    <div style={s.notesLabel}>💬 Speaker Notes</div>
-                    <p style={s.notesText}>{slide.speakerNotes}</p>
-                  </div>
-                )}
               </div>
-
-              {/* Navigation */}
-              <div style={s.navControls}>
-                <button
-                  onClick={() => setActiveSlide(Math.max(0, activeSlide - 1))}
-                  disabled={activeSlide === 0}
-                  style={activeSlide === 0 ? { ...s.navBtn, opacity: 0.3 } : s.navBtn}
-                >
-                  ← Previous
-                </button>
-                <span style={s.navCounter}>{activeSlide + 1} / {slides.length}</span>
-                <button
-                  onClick={() => setActiveSlide(Math.min(slides.length - 1, activeSlide + 1))}
-                  disabled={activeSlide === slides.length - 1}
-                  style={activeSlide === slides.length - 1 ? { ...s.navBtn, opacity: 0.3 } : s.navBtn}
-                >
-                  Next →
-                </button>
+            ) : (
+              /* Regular slide */
+              <div style={s.regularSlide}>
+                <h2 style={{ ...s.slideTitle, color: theme.accent }}>{slide.title}</h2>
+                <ul style={s.bulletList}>
+                  {(slide.content || []).map((point, i) => (
+                    <li key={i} style={s.bulletItem}
+                      className="animate-slideInLeft"
+                      style2={{ animationDelay:`${i*0.1}s` }}>
+                      <span style={{ ...s.bulletDot, background: theme.accent,
+                        boxShadow:`0 0 8px ${theme.accent}60` }} />
+                      <span style={s.bulletText}>{point}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </>
-          )}
-        </div>
-      </div>
+            )}
 
-      {/* All slides overview */}
-      <div style={s.overviewSection}>
-        <h3 style={s.overviewTitle}>📋 All Slides Overview</h3>
-        <div style={s.overviewGrid}>
-          {slides.map((sl, i) => (
-            <div key={i} style={s.overviewCard} onClick={() => { setActiveSlide(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>
-              <div style={{ ...s.overviewNum, color: SLIDE_COLORS[i % SLIDE_COLORS.length] }}>
-                Slide {sl.number}
-              </div>
-              <div style={s.overviewSlideTitle}>{sl.title}</div>
-              <ul style={s.overviewBullets}>
-                {(sl.content || []).slice(0, 3).map((point, j) => (
-                  <li key={j} style={s.overviewBullet}>
-                    <span style={{ color: SLIDE_COLORS[i % SLIDE_COLORS.length], marginRight: 6 }}>·</span>
-                    {point.length > 60 ? point.slice(0, 60) + '…' : point}
-                  </li>
-                ))}
-              </ul>
+            {/* Branding footer */}
+            <div style={s.slideFooter}>
+              <span style={{ ...s.footerBrand, color:`${theme.accent}70` }}>{primaryName}</span>
+              <span style={s.footerDivider}>·</span>
+              <span style={s.footerTagline}>{tagline}</span>
+              <span style={{ marginLeft:'auto', ...s.footerConfidential }}>Confidential</span>
             </div>
-          ))}
+          </div>
+
+          {/* Speaker notes */}
+          {notes && slide.speakerNotes && (
+            <div style={s.notesBox} className="animate-fadeInUp">
+              <div style={{ ...s.notesHeader, borderLeftColor: theme.accent }}>
+                <span style={{ color: theme.accent }}>💬</span>
+                <span style={s.notesTitle}>Speaker Notes</span>
+              </div>
+              <p style={s.notesText}>{slide.speakerNotes}</p>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div style={s.navBar}>
+            <button onClick={() => setActive(Math.max(0,active-1))} disabled={active===0}
+              style={active===0 ? {...s.navBtn, opacity:0.3} : s.navBtn}>
+              ← Prev
+            </button>
+            <div style={s.navDots}>
+              {slides.map((_,i) => (
+                <button key={i} onClick={() => setActive(i)} style={{
+                  ...s.navDot,
+                  background: i===active ? theme.accent : 'var(--border)',
+                  width: i===active ? 20 : 8,
+                  boxShadow: i===active ? `0 0 8px ${theme.accent}` : 'none',
+                }} />
+              ))}
+            </div>
+            <button onClick={() => setActive(Math.min(slides.length-1,active+1))} disabled={active===slides.length-1}
+              style={active===slides.length-1 ? {...s.navBtn, opacity:0.3} : s.navBtn}>
+              Next →
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* All slides grid */}
+      {!isFullscreen && (
+        <div style={s.overviewSection}>
+          <p className="section-eyebrow">All Slides</p>
+          <div style={s.overviewGrid}>
+            {slides.map((sl, i) => {
+              const t = SLIDE_THEMES[i % SLIDE_THEMES.length];
+              return (
+                <div key={i} style={{ ...s.overviewCard, borderColor: active===i ? t.accent : 'var(--border)' }}
+                  className="glass-card"
+                  onClick={() => setActive(i)}>
+                  <div style={{ ...s.overviewNum, color: t.accent }}>
+                    Slide {sl.number}
+                  </div>
+                  <div style={s.overviewTitle}>{sl.title}</div>
+                  <ul style={s.overviewBullets}>
+                    {(sl.content || []).slice(0,2).map((p,j) => (
+                      <li key={j} style={s.overviewBullet}>
+                        <span style={{ color: t.accent }}>·</span> {p.length>50?p.slice(0,50)+'…':p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Investor FAQ */}
-      {data.investorFAQ?.length > 0 && (
+      {data.investorFAQ?.length > 0 && !isFullscreen && (
         <div style={s.faqSection}>
-          <h3 style={s.overviewTitle}>❓ Investor FAQ</h3>
-          {data.investorFAQ.map((faq, i) => (
-            <div key={i} style={s.faqItem}>
-              <div style={s.faqQ}>{faq.question}</div>
-              <div style={s.faqA}>{faq.answer}</div>
-            </div>
-          ))}
+          <p className="section-eyebrow">Investor Q&A</p>
+          <h3 style={s.faqHeading}>❓ Anticipated Investor Questions</h3>
+          <div style={s.faqGrid}>
+            {data.investorFAQ.map((f, i) => (
+              <div key={i} style={s.faqCard} className="glass-card">
+                <div style={s.faqQ}>{f.question}</div>
+                <div style={s.faqA}>{f.answer}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-const Empty = () => (
-  <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>No pitch deck data</div>
-);
-
 const s = {
-  root: { display: 'flex', flexDirection: 'column', gap: 24 },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' },
-  title: { fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700 },
-  subtitle: { fontSize: 14, color: 'var(--text-muted)', marginTop: 4 },
-  notesBtn: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)',
-    padding: '8px 16px', fontSize: 13, cursor: 'pointer',
-    fontFamily: 'var(--font-body)',
+  root: { display:'flex', flexDirection:'column', gap:24 },
+  header: { display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:12 },
+  title: { fontFamily:'var(--font-display)', fontSize:24, fontWeight:800 },
+  subtitle: { fontSize:13, color:'var(--text-muted)', marginTop:4 },
+  headerActions: { display:'flex', gap:10 },
+  headerBtn: {
+    background:'rgba(255,255,255,0.04)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-md)', color:'var(--text-secondary)',
+    padding:'9px 16px', fontSize:13, cursor:'pointer',
+    fontFamily:'var(--font-body)', transition:'all 0.2s',
   },
-  notesBtnActive: { background: 'var(--amber-dim)', borderColor: 'var(--amber)', color: 'var(--amber)' },
+  headerBtnActive: { background:'var(--amber-dim)', borderColor:'var(--amber)', color:'var(--amber)' },
 
-  layout: { display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' },
+  layout: { display:'grid', gridTemplateColumns:'180px 1fr', gap:20 },
+  fullscreen: {
+    position:'fixed', inset:0, zIndex:200,
+    background:'var(--bg-void)', padding:32,
+    display:'flex', flexDirection:'column',
+  },
 
-  sidebar: {
-    display: 'flex', flexDirection: 'column', gap: 4,
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', padding: '12px',
-    maxHeight: 540, overflowY: 'auto',
+  // Sidebar
+  sidebar: {},
+  sidebarInner: {
+    background:'var(--bg-card)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-xl)', padding:10,
+    maxHeight:520, overflowY:'auto', display:'flex', flexDirection:'column', gap:4,
   },
   thumb: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '10px 12px', borderRadius: 'var(--radius-md)',
-    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
-    transition: 'background 0.15s', fontFamily: 'var(--font-body)',
+    display:'flex', flexDirection:'column', gap:6,
+    padding:'8px 6px', borderRadius:'var(--r-md)',
+    background:'none', border:'none', cursor:'pointer',
+    transition:'background 0.15s', fontFamily:'var(--font-body)',
   },
-  thumbActive: { background: 'var(--bg-elevated)' },
-  thumbNum: {
-    width: 26, height: 26, borderRadius: 6,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 12, fontWeight: 800, flexShrink: 0,
+  thumbActive: { background:'rgba(255,255,255,0.06)' },
+  thumbMini: {
+    height:56, borderRadius:8, padding:8, border:'1.5px solid',
+    display:'flex', flexDirection:'column', justifyContent:'space-between',
   },
-  thumbTitle: { fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.3 },
+  thumbNum: { fontSize:10, fontWeight:800, fontFamily:'var(--font-mono)' },
+  thumbBars: { display:'flex', flexDirection:'column', gap:3 },
+  thumbBar: { height:3, borderRadius:2 },
+  thumbLabel: { fontSize:10, lineHeight:1.3, textAlign:'left' },
 
-  mainArea: { display: 'flex', flexDirection: 'column', gap: 16 },
-  slideContainer: { display: 'flex', flexDirection: 'column', gap: 12 },
-
+  // Main
+  main: { display:'flex', flexDirection:'column', gap:14 },
   slide: {
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-xl)',
-    padding: '40px 48px',
-    minHeight: 380,
-    position: 'relative',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    animation: 'fadeIn 0.3s ease',
+    border:'1px solid var(--border)', borderRadius:'var(--r-xl)',
+    minHeight:400, position:'relative', overflow:'hidden',
+    display:'flex', flexDirection:'column',
   },
-  slideBar: { position: 'absolute', top: 0, left: 0, right: 0, height: 4 },
-  slideNumBadge: {
-    fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
-    marginBottom: 20, letterSpacing: 2,
-  },
-  slideTitle: {
-    fontFamily: 'var(--font-display)',
-    fontSize: 32, fontWeight: 800,
-    marginBottom: 28, lineHeight: 1.2,
+  slideAccentBar: { height:3, width:'100%' },
+  slideCounter: {
+    fontFamily:'var(--font-mono)', fontSize:11, fontWeight:700,
+    letterSpacing:3, padding:'12px 28px 0',
   },
 
-  titleSlideContent: { display: 'flex', flexDirection: 'column', gap: 12, flex: 1, justifyContent: 'center' },
-  companyName: { fontFamily: 'var(--font-display)', fontSize: 48, fontWeight: 900, lineHeight: 1 },
-  companyTagline: { fontSize: 20, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' },
-  titleMeta: { fontSize: 14, color: 'rgba(255,255,255,0.4)', marginTop: 4 },
-
-  bulletList: { listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 },
-  bulletItem: { display: 'flex', gap: 16, alignItems: 'flex-start' },
-  bullet: { width: 8, height: 8, borderRadius: '50%', marginTop: 6, flexShrink: 0 },
-  bulletText: { fontSize: 16, color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 },
-
-  slideBranding: {
-    position: 'absolute', bottom: 16, right: 24,
-    display: 'flex', gap: 8, alignItems: 'center',
-    fontSize: 12,
+  // Title slide
+  titleSlide: {
+    flex:1, display:'flex', flexDirection:'column',
+    alignItems:'center', justifyContent:'center',
+    padding:'32px 48px', textAlign:'center', position:'relative',
   },
+  titleSlideGlow: { position:'absolute', inset:0, pointerEvents:'none' },
+  titleBadge: {
+    padding:'6px 16px', borderRadius:100, fontSize:12, fontWeight:700,
+    marginBottom:20, display:'inline-block',
+  },
+  titleName: {
+    fontFamily:'var(--font-display)', fontSize:56, fontWeight:900, lineHeight:1,
+    marginBottom:12,
+  },
+  titleTagline: { fontSize:20, color:'rgba(255,255,255,0.55)', fontStyle:'italic', marginBottom:8 },
+  titleMeta: { fontSize:14, color:'rgba(255,255,255,0.35)', marginTop:4 },
+  titleFooter: { marginTop:32 },
+  titleYear: { fontFamily:'var(--font-mono)', fontSize:16, fontWeight:700 },
 
+  // Regular slide
+  regularSlide: { flex:1, padding:'20px 28px 16px' },
+  slideTitle: { fontFamily:'var(--font-display)', fontSize:28, fontWeight:800, marginBottom:24, lineHeight:1.2 },
+  bulletList: { listStyle:'none', display:'flex', flexDirection:'column', gap:14 },
+  bulletItem: { display:'flex', alignItems:'flex-start', gap:14 },
+  bulletDot: { width:9, height:9, borderRadius:'50%', marginTop:6, flexShrink:0 },
+  bulletText: { fontSize:16, color:'rgba(255,255,255,0.82)', lineHeight:1.65 },
+
+  // Footer
+  slideFooter: {
+    display:'flex', alignItems:'center', gap:10,
+    padding:'12px 28px',
+    borderTop:'1px solid rgba(255,255,255,0.05)',
+    fontSize:11,
+  },
+  footerBrand: { fontFamily:'var(--font-display)', fontWeight:700 },
+  footerDivider: { color:'rgba(255,255,255,0.2)' },
+  footerTagline: { color:'rgba(255,255,255,0.25)', fontStyle:'italic' },
+  footerConfidential: { color:'rgba(255,255,255,0.15)', fontSize:10, letterSpacing:1, textTransform:'uppercase' },
+
+  // Notes
   notesBox: {
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '16px 20px',
-    borderLeft: '4px solid var(--amber)',
+    background:'var(--bg-card)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-lg)', padding:'18px 20px',
   },
-  notesLabel: { fontSize: 12, color: 'var(--amber)', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 },
-  notesText: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7 },
+  notesHeader: { display:'flex', alignItems:'center', gap:10, marginBottom:10, paddingLeft:12, borderLeft:'3px solid' },
+  notesTitle: { fontSize:13, fontWeight:700, color:'var(--text-secondary)', textTransform:'uppercase', letterSpacing:1 },
+  notesText: { fontSize:14, color:'var(--text-secondary)', lineHeight:1.75 },
 
-  navControls: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  // Nav
+  navBar: { display:'flex', justifyContent:'space-between', alignItems:'center' },
   navBtn: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', color: 'var(--text-secondary)',
-    padding: '10px 20px', fontSize: 14, cursor: 'pointer',
-    fontFamily: 'var(--font-body)',
+    background:'var(--bg-card)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-md)', color:'var(--text-secondary)',
+    padding:'10px 20px', fontSize:14, cursor:'pointer',
+    fontFamily:'var(--font-body)', transition:'all 0.2s',
   },
-  navCounter: { fontSize: 14, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' },
+  navDots: { display:'flex', gap:6, alignItems:'center' },
+  navDot: {
+    height:8, borderRadius:4, border:'none', cursor:'pointer',
+    transition:'all 0.3s', padding:0,
+  },
 
+  // Overview
   overviewSection: {
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', padding: '28px',
+    background:'var(--bg-card)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-xl)', padding:'24px 28px',
   },
-  overviewTitle: { fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, marginBottom: 20 },
-  overviewGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 },
+  overviewGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))', gap:12, marginTop:16 },
   overviewCard: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '16px', cursor: 'pointer',
-    transition: 'border-color 0.2s',
+    borderRadius:'var(--r-lg)', padding:'16px', cursor:'pointer',
+    transition:'all 0.2s', border:'1px solid',
   },
-  overviewNum: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
-  overviewSlideTitle: { fontSize: 14, fontWeight: 700, marginBottom: 10, color: 'var(--text-primary)' },
-  overviewBullets: { listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 },
-  overviewBullet: { fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.4 },
+  overviewNum: { fontSize:11, fontWeight:800, fontFamily:'var(--font-mono)', marginBottom:6, letterSpacing:2 },
+  overviewTitle: { fontSize:14, fontWeight:700, marginBottom:8 },
+  overviewBullets: { listStyle:'none', display:'flex', flexDirection:'column', gap:4 },
+  overviewBullet: { fontSize:11, color:'var(--text-muted)', lineHeight:1.4 },
 
+  // FAQ
   faqSection: {
-    background: 'var(--bg-card)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-lg)', padding: '28px',
-    display: 'flex', flexDirection: 'column', gap: 16,
+    background:'var(--bg-card)', border:'1px solid var(--border)',
+    borderRadius:'var(--r-xl)', padding:'24px 28px',
   },
-  faqItem: {
-    background: 'var(--bg-surface)', border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)', padding: '20px',
-  },
-  faqQ: { fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 },
-  faqA: { fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7 },
+  faqHeading: { fontFamily:'var(--font-display)', fontSize:18, fontWeight:700, marginBottom:20, marginTop:8 },
+  faqGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:14 },
+  faqCard: { borderRadius:'var(--r-lg)', padding:'20px' },
+  faqQ: { fontSize:15, fontWeight:700, color:'var(--text-primary)', marginBottom:10 },
+  faqA: { fontSize:14, color:'var(--text-secondary)', lineHeight:1.7 },
 };
