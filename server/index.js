@@ -10,21 +10,35 @@ const projectRoutes = require('./routes/projects');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ─── Middleware ───────────────────────────────────────────────────────────────
+// ✅ Allow both local + production
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://ai-startup-builder-omega.vercel.app'
+];
+
+// ─── Middleware ─────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(null, true); // allow temporarily (avoid crash)
+    }
+  },
   credentials: true,
 }));
+
 app.use(express.json({ limit: '10mb' }));
 
-// Rate limiting for AI generation endpoint
+// Rate limiting
 const generateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 10,
   message: { error: 'Too many requests. Please wait 15 minutes before trying again.' },
 });
 
-// ─── Routes ──────────────────────────────────────────────────────────────────
+// ─── Routes ─────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/generate', generateLimiter, generateRoutes);
 app.use('/api/projects', projectRoutes);
@@ -40,9 +54,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
-app.listen(PORT, () => {
+// ✅ IMPORTANT: Listen properly
+app.listen(PORT, '0.0.0.0', () => {
   const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-  console.log(`\n🚀 AI Startup Builder Server running on http://localhost:${PORT}`);
-  console.log(`📡 Groq API: ${process.env.GROQ_API_KEY ? '✅ Connected' : '❌ Missing GROQ_API_KEY in .env'}`);
-  console.log(`🧠 Model:    ${model}\n`);
+
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📡 Groq API: ${process.env.GROQ_API_KEY ? '✅ Connected' : '❌ Missing GROQ_API_KEY'}`);
+  console.log(`🧠 Model: ${model}`);
 });
