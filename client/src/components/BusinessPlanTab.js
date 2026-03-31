@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { copyToClipboard } from '../utils/export';
 
 // ── Animated number ───────────────────────────────────────────────────────────
 function AnimNum({ val }) {
